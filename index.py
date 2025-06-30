@@ -235,21 +235,21 @@ def decode_message():
     API endpoint untuk decoding pesan dari gambar
     
     Expected form data:
-    - image: file (PNG/BMP) OR cloudinary_url: string
+    - image_decode: file (PNG/BMP)
     - password: string
     
     Returns:
     - JSON response dengan extracted message atau error
     """
     try:
-        password = request.form.get('password')
-        cloudinary_url = request.form.get('cloudinary_url')
-        
-        if not password:
+        # Check if password is provided
+        if 'password' not in request.form:
             return jsonify({
                 'success': False,
                 'error': 'Password is required'
             }), 400
+
+        password = request.form['password']
 
         if not password.strip():
             return jsonify({
@@ -257,33 +257,15 @@ def decode_message():
                 'error': 'Password cannot be empty'
             }), 400
 
-        # Check if Cloudinary URL is provided
-        if cloudinary_url:
-            try:
-                extracted_message = extract_message_from_url(cloudinary_url, password)
-                
-                return jsonify({
-                    'success': True,
-                    'message': 'Pesan berhasil diekstrak dari gambar Cloudinary',
-                    'extracted_message': extracted_message,
-                    'source': 'cloudinary_url',
-                    'cloudinary_url': cloudinary_url
-                })
-            except Exception as e:
-                return jsonify({
-                    'success': False,
-                    'error': f'Error extracting message from Cloudinary URL: {str(e)}. Pastikan URL valid, password benar dan gambar mengandung pesan tersembunyi.'
-                }), 400
-
-        # Otherwise, handle file upload
-        if 'image' not in request.files:
+        # Check if image file is uploaded
+        if 'image_decode' not in request.files:
             return jsonify({
                 'success': False,
-                'error': 'No image file or cloudinary_url provided'
+                'error': 'No image file provided'
             }), 400
 
-        file = request.files['image']
-
+        file = request.files['image_decode']
+        
         # Validate inputs
         if file.filename == '':
             return jsonify({
@@ -298,14 +280,13 @@ def decode_message():
             }), 400
 
         try:
-            # Extract message from file directly
+            # Extract message from uploaded file directly
             extracted_message = extract_message_from_bytes(file, password)
             
             return jsonify({
                 'success': True,
                 'message': 'Pesan berhasil diekstrak dari gambar',
                 'extracted_message': extracted_message,
-                'source': 'uploaded_file',
                 'original_filename': file.filename
             })
 
@@ -370,5 +351,6 @@ def index():
 # Vercel requires this
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
-# This is the correct way to export Flask app for Vercel
-app = app
+# For Vercel deployment
+if __name__ == '__main__':
+    app.run(debug=False)
