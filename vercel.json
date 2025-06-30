@@ -1,20 +1,15 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "./index.py",
-      "use": "@vercel/python"
+  "functions": {
+    "index.py": {
+      "runtime": "python3.9",
+      "maxDuration": 30
     }
-  ],
+  },
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "/"
+      "dest": "/index"
     }
-  ],
-  "functions": {
-    "index.py": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }
