@@ -370,13 +370,5 @@ def index():
 # Vercel requires this
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
 
-# For Vercel deployment - Export the app
-def handler(request):
-    return app(request.environ, lambda status, headers: None)
-
-# This is required for Vercel
-if __name__ == '__main__':
-    app.run(debug=False)
-
-# Export app for Vercel
-application = app
+# This is the correct way to export Flask app for Vercel
+app = app
