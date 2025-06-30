@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, send_file
-from flask_cors import CORS  # Tambahkan ini
+from flask_cors import CORS  # Import CORS
 from PIL import Image
 import random
 import hashlib
@@ -11,9 +11,20 @@ import tempfile
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
+from datetime import datetime
 
 app = Flask(__name__)
-CORS(app)
+
+# Configure CORS to allow all domains
+CORS(app, resources={
+    r"/api/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
+        "allow_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Origin"],
+        "expose_headers": ["Content-Type", "Authorization", "Access-Control-Allow-Origin"],
+        "supports_credentials": True
+    }
+})
 
 # Configure Cloudinary
 cloudinary.config(
@@ -132,7 +143,7 @@ def extract_message_from_bytes(image_bytes, password):
     chars = [chr(int(bits[i:i + 8], 2)) for i in range(0, len(bits), 8)]
     return ''.join(chars)
 
-@app.route('/api/encode', methods=['POST'])
+@app.route('/api/encode', methods=['POST', 'OPTIONS'])
 def encode_message():
     """
     API endpoint untuk encoding pesan ke dalam gambar
@@ -145,6 +156,14 @@ def encode_message():
     Returns:
     - JSON response dengan Cloudinary URL atau error
     """
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = jsonify({'success': True})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response
+    
     try:
         # Validate request
         if 'image' not in request.files:
@@ -193,8 +212,7 @@ def encode_message():
             img_bytes = embed_message(file, message, password)
             
             # Upload result to Cloudinary
-            import datetime
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             base_name = os.path.splitext(secure_filename(file.filename))[0]
             output_filename = f"stego_{base_name}_{timestamp}"
             
@@ -204,7 +222,7 @@ def encode_message():
                 output_filename
             )
             
-            return jsonify({
+            response = jsonify({
                 'success': True,
                 'message': 'Pesan berhasil disisipkan ke dalam gambar dan diupload ke Cloudinary',
                 'cloudinary_url': cloudinary_url,
@@ -212,26 +230,35 @@ def encode_message():
                 'output_filename': output_filename,
                 'original_filename': file.filename
             })
+            
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
 
         except ValueError as ve:
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': str(ve)
-            }), 400
+            })
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 400
 
         except Exception as e:
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': f'Error processing image: {str(e)}'
-            }), 500
+            })
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 500
 
     except Exception as e:
-        return jsonify({
+        response = jsonify({
             'success': False,
             'error': f'Server error: {str(e)}'
-        }), 500
+        })
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 500
 
-@app.route('/api/decode', methods=['POST'])
+@app.route('/api/decode', methods=['POST', 'OPTIONS'])
 def decode_message():
     """
     API endpoint untuk decoding pesan dari gambar
@@ -243,78 +270,120 @@ def decode_message():
     Returns:
     - JSON response dengan extracted message atau error
     """
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = jsonify({'success': True})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        return response
+    
     try:
         # Check if password is provided
         if 'password' not in request.form:
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'Password is required'
-            }), 400
+            })
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 400
 
         password = request.form['password']
 
         if not password.strip():
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'Password cannot be empty'
-            }), 400
+            })
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 400
 
         # Check if image file is uploaded
         if 'image_decode' not in request.files:
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'No image file provided'
-            }), 400
+            })
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 400
 
         file = request.files['image_decode']
         
         # Validate inputs
         if file.filename == '':
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'No file selected'
-            }), 400
+            })
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 400
 
         if not allowed_file(file.filename):
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': 'File type not allowed. Only PNG and BMP files are supported.'
-            }), 400
+            })
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 400
 
         try:
             # Extract message from uploaded file directly
             extracted_message = extract_message_from_bytes(file, password)
             
-            return jsonify({
+            response = jsonify({
                 'success': True,
                 'message': 'Pesan berhasil diekstrak dari gambar',
                 'extracted_message': extracted_message,
                 'original_filename': file.filename
             })
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
 
         except Exception as e:
-            return jsonify({
+            response = jsonify({
                 'success': False,
                 'error': f'Error extracting message: {str(e)}. Pastikan password benar dan gambar mengandung pesan tersembunyi.'
-            }), 400
+            })
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 400
 
     except Exception as e:
-        return jsonify({
+        response = jsonify({
             'success': False,
             'error': f'Server error: {str(e)}'
-        }), 500
+        })
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 500
 
-@app.route('/api/health', methods=['GET'])
+@app.route('/api/health', methods=['GET', 'OPTIONS'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = jsonify({'success': True})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        return response
+    
+    response = jsonify({
         'status': 'healthy',
         'message': 'LSB Steganography API is running'
     })
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['GET', 'OPTIONS'])
 def index():
     """API documentation endpoint"""
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = jsonify({'success': True})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        return response
+    
     docs = {
         'name': 'LSB Matching Steganography API',
         'version': '1.0.0',
@@ -348,7 +417,9 @@ def index():
         'cloudinary_integration': True,
         'note': 'Images are automatically uploaded to Cloudinary for storage and sharing'
     }
-    return jsonify(docs)
+    response = jsonify(docs)
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
 # Vercel requires this
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
